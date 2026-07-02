@@ -1161,11 +1161,12 @@ function downloadPDF() {
   <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
   <style>
     @page { margin: 15mm 15mm 15mm 15mm; size: A4; }
+    html, body { margin: 0 !important; padding: 0 !important; background: white !important; }
     body, div { font-family: 'Roboto', sans-serif; color: #1a1a1a; font-size: 13px; line-height: 1.5; background: white; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
     * { box-sizing: border-box; }
     a { display: none; }
   </style>
-  <div style="font-family: 'Roboto', sans-serif; color: #1a1a1a; font-size: 13px; line-height: 1.5; background: white; width: 790px; padding: 20px; box-sizing: border-box; margin: 0 auto;">
+  <div style="font-family: 'Roboto', sans-serif; color: #1a1a1a; font-size: 13px; line-height: 1.5; background: white; width: 750px; padding: 10px; box-sizing: border-box; margin: 0; float: left;">
 
   <!-- HEADER -->
   <table width="100%" style="margin-bottom:28px"><tr>
@@ -1257,7 +1258,7 @@ function downloadPDF() {
     margin:       10,
     filename:     `Invoice_${invNum || 'Draft'}.pdf`,
     image:        { type: 'jpeg', quality: 0.98 },
-    html2canvas:  { scale: 2, useCORS: true, width: 790 },
+    html2canvas:  { scale: 2, useCORS: true, width: 750 },
     jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' }
   };
   

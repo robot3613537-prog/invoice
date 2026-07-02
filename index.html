@@ -1262,8 +1262,32 @@ function downloadPDF() {
     jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' }
   };
   
-  // Use html2pdf library to generate and download the PDF directly from the HTML template string
-  html2pdf().from(html).set(opt).save();
+  const worker = html2pdf().from(html).set(opt);
+  const fileName = `Invoice_${invNum || 'Draft'}.pdf`;
+
+  // Check if Web Share API is supported for sending files (standard on mobile browsers / WebViews)
+  if (navigator.share && navigator.canShare) {
+    worker.outputPdf('blob').then(pdfBlob => {
+      const file = new File([pdfBlob], fileName, { type: 'application/pdf' });
+      if (navigator.canShare({ files: [file] })) {
+        navigator.share({
+          files: [file],
+          title: `Invoice #${invNum || 'Draft'}`,
+          text: `Tax Invoice #${invNum || 'Draft'}`
+        }).catch(err => {
+          // Fallback if sharing sheet is closed or cancelled
+          worker.save();
+        });
+      } else {
+        worker.save();
+      }
+    }).catch(err => {
+      worker.save();
+    });
+  } else {
+    // Fallback for laptop/desktop browsers
+    worker.save();
+  }
 }
 
 function printInvoice() {

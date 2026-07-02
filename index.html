@@ -702,9 +702,12 @@
     <div class="actions-card">
       <div class="actions-stack">
         <button class="btn btn-primary btn-full" onclick="downloadPDF()">
-          ⬇ Download PDF
+          ⬇ Download PDF (App)
         </button>
-        <button class="btn btn-outline btn-full" onclick="showPreview()">
+        <button class="btn btn-outline btn-full" onclick="printInvoice()">
+          🖨️ Print / Save (System)
+        </button>
+        <button class="btn btn-outline btn-full" onclick="showPreview()" style="color:var(--ink);border:1.5px solid var(--border)">
           👁 Preview Invoice
         </button>
         <button class="btn btn-ghost btn-full" style="color:var(--ink);border:1.5px solid var(--border)" onclick="saveData()">
@@ -729,8 +732,9 @@
   <div class="modal-box">
     <div class="modal-header">
       <h3>Invoice Preview</h3>
-      <div style="display:flex;gap:0.75rem;align-items:center">
-        <button class="btn btn-primary btn-sm" onclick="downloadPDF()">⬇ Print / Save PDF</button>
+      <div style="display:flex;gap:0.5rem;align-items:center">
+        <button class="btn btn-primary btn-sm" onclick="downloadPDF()">⬇ Download</button>
+        <button class="btn btn-outline btn-sm" onclick="printInvoice()" style="color:var(--ink);border:1px solid var(--border)">🖨️ Print</button>
         <button class="close-btn" onclick="document.getElementById('previewModal').classList.remove('active')">×</button>
       </div>
     </div>
@@ -1161,7 +1165,7 @@ function downloadPDF() {
     * { box-sizing: border-box; }
     a { display: none; }
   </style>
-  <div style="font-family: 'Roboto', sans-serif; color: #1a1a1a; font-size: 13px; line-height: 1.5; background: white;">
+  <div style="font-family: 'Roboto', sans-serif; color: #1a1a1a; font-size: 13px; line-height: 1.5; background: white; width: 790px; padding: 20px; box-sizing: border-box; margin: 0 auto;">
 
   <!-- HEADER -->
   <table width="100%" style="margin-bottom:28px"><tr>
@@ -1253,12 +1257,155 @@ function downloadPDF() {
     margin:       10,
     filename:     `Invoice_${invNum || 'Draft'}.pdf`,
     image:        { type: 'jpeg', quality: 0.98 },
-    html2canvas:  { scale: 2, useCORS: true },
+    html2canvas:  { scale: 2, useCORS: true, width: 790 },
     jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' }
   };
   
   // Use html2pdf library to generate and download the PDF directly from the HTML template string
   html2pdf().from(html).set(opt).save();
+}
+
+function printInvoice() {
+  const logoSrc = document.getElementById('logoImg').src;
+  const logoVisible = document.getElementById('logoImg').style.display !== 'none' && logoSrc && !logoSrc.endsWith('/invoice_generator.html');
+
+  const from = document.getElementById('fromField').value;
+  const billTo = document.getElementById('billTo').value;
+  const shipTo = document.getElementById('shipTo').value;
+  const invNum = document.getElementById('invoiceNum').value;
+  const invDate = document.getElementById('invoiceDate').value;
+  const dueDate = document.getElementById('dueDate').value;
+  const payTerms = document.getElementById('payTerms').value;
+  const poNum = document.getElementById('poNum').value;
+  const notes = document.getElementById('notes').value;
+  const terms = document.getElementById('terms').value;
+  const taxType = document.getElementById('taxTypeInput').value || 'CGST + SGST';
+  const taxRate = parseFloat(document.getElementById('taxRate').value||0);
+  const disc = parseFloat(document.getElementById('discountAmt')?.value||0);
+  const ship = parseFloat(document.getElementById('shippingAmt')?.value||0);
+  const paid = parseFloat(document.getElementById('amtPaid').value||0);
+  const invoiceType = document.getElementById('invoiceTypeInput').value;
+  const yourGst = document.getElementById('yourGst').value.trim().toUpperCase();
+  const clientGst = document.getElementById('clientGst').value.trim().toUpperCase();
+  const stateCode = document.getElementById('stateCode').value.trim();
+
+  const sub = items.reduce((s,i) => s + parseFloat(i.qty||0)*parseFloat(i.rate||0), 0);
+  const noTax = ['None','none','Exempt','Zero Rated','exempt','zero rated'].includes((taxType||'').trim()); const taxAmt = noTax ? 0 : sub * taxRate / 100;
+  const total = sub + taxAmt - disc + ship;
+  const balance = total - paid;
+
+  function fmt(n) { return n.toLocaleString('en-IN',{minimumFractionDigits:2,maximumFractionDigits:2}); }
+  function fmtDate(d) {
+    if (!d) return '';
+    const dt = new Date(d + 'T00:00:00');
+    return dt.toLocaleDateString('en-IN', { year:'numeric', month:'long', day:'numeric' });
+  }
+  function esc(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+  // Only filled items
+  const filledItems = items.filter(i => (i.desc||'').trim() || parseFloat(i.rate)>0);
+
+  const itemRows = filledItems.map(i => `
+    <tr>
+      <td style="padding:11px 14px;border-bottom:1px solid #e8e8e8;font-weight:700;font-size:13px;vertical-align:top">
+        ${esc(i.desc)||'—'}
+        ${i.hsn ? `<div style="font-size:11px;color:#888;font-weight:400;margin-top:2px">HSN/SAC: ${esc(i.hsn)}</div>` : ''}
+      </td>
+      <td style="padding:11px 14px;border-bottom:1px solid #e8e8e8;text-align:right;font-size:13px">${i.qty}</td>
+      <td style="padding:11px 14px;border-bottom:1px solid #e8e8e8;text-align:right;font-size:13px">${currency}${fmt(parseFloat(i.rate||0))}</td>
+      <td style="padding:11px 14px;border-bottom:1px solid #e8e8e8;text-align:right;font-size:13px">${currency}${fmt(parseFloat(i.qty||0)*parseFloat(i.rate||0))}</td>
+    </tr>`).join('');
+
+  const html = `
+  <div style="font-family: 'Roboto', sans-serif; color: #1a1a1a; font-size: 13px; line-height: 1.5; background: white;">
+
+  <!-- HEADER -->
+  <table width="100%" style="margin-bottom:28px"><tr>
+    <td style="vertical-align:top;width:55%">
+      ${logoVisible ? `<img src="${logoSrc}" style="max-height:70px;max-width:160px;margin-bottom:10px;display:block">` : ''}
+      <div style="font-size:13px;line-height:1.75">
+        ${from ? from.split('\n').map((line,i) => i===0
+          ? `<div style="font-weight:700;font-size:14px">${esc(line)}</div>`
+          : `<div style="color:#333">${esc(line)}</div>`).join('') : ''}
+        ${yourGst ? `<div style="color:#333">GSTIN/UIN: ${esc(yourGst)}</div>` : ''}
+        ${stateCode ? `<div style="color:#333">State Code: ${esc(stateCode)}</div>` : ''}
+      </div>
+    </td>
+    <td style="vertical-align:top;text-align:right">
+      <div style="font-size:38px;font-weight:300;letter-spacing:3px;text-transform:uppercase;line-height:1">${esc(invoiceType)}</div>
+      <div style="font-size:13px;color:#666;margin-top:5px;font-weight:300"># ${esc(invNum)}</div>
+    </td>
+  </tr></table>
+
+  <!-- DATE + BALANCE -->
+  <table width="100%" style="margin-bottom:22px"><tr>
+    <td style="vertical-align:top">
+      ${invDate ? `<div style="font-size:13px;color:#555"><span style="color:#999">Date: </span>${fmtDate(invDate)}</div>` : ''}
+      ${dueDate ? `<div style="font-size:13px;color:#555;margin-top:3px"><span style="color:#999">Due Date: </span>${fmtDate(dueDate)}</div>` : ''}
+      ${payTerms ? `<div style="font-size:13px;color:#555;margin-top:3px"><span style="color:#999">Payment Terms: </span>${esc(payTerms)}</div>` : ''}
+      ${poNum ? `<div style="font-size:13px;color:#555;margin-top:3px"><span style="color:#999">PO Number: </span>${esc(poNum)}</div>` : ''}
+    </td>
+    <td style="text-align:right;vertical-align:top">
+      <div style="display:inline-block;background:#f2f2f2;padding:8px 16px;border-radius:4px">
+        <span style="font-weight:700;font-size:13px">Balance Due: </span>
+        <span style="font-weight:700;font-size:15px">${currency}${fmt(balance)}</span>
+      </div>
+    </td>
+  </tr></table>
+
+  <!-- BILL TO -->
+  <div style="margin-bottom:24px;font-size:13px;line-height:1.75">
+    <div style="color:#888;font-size:12px;margin-bottom:2px">Bill To:</div>
+    ${billTo ? billTo.split('\n').map((line,i) => i===0
+      ? `<div style="font-weight:700;font-size:14px">${esc(line)}</div>`
+      : `<div>${esc(line)}</div>`).join('') : ''}
+    ${clientGst ? `<div style="margin-top:6px;color:#444">GST NO- ${esc(clientGst)}</div>` : ''}
+  </div>
+
+  ${shipTo ? `<div style="margin-bottom:24px;font-size:13px;line-height:1.75">
+    <div style="color:#888;font-size:12px;margin-bottom:2px">Ship To:</div>
+    ${shipTo.split('\n').map((line,i) => i===0
+      ? `<div style="font-weight:700;font-size:14px">${esc(line)}</div>`
+      : `<div>${esc(line)}</div>`).join('')}
+  </div>` : ''}
+
+  <!-- ITEMS TABLE -->
+  <table width="100%" style="border-collapse:collapse;margin-bottom:24px">
+    <thead>
+      <tr style="background:#2d2d2d;color:white">
+        <th style="padding:10px 14px;font-size:12px;font-weight:500;letter-spacing:0.3px;text-align:left;border-radius:4px 0 0 0">Item</th>
+        <th style="padding:10px 14px;font-size:12px;font-weight:500;text-align:right">Quantity</th>
+        <th style="padding:10px 14px;font-size:12px;font-weight:500;text-align:right">Rate</th>
+        <th style="padding:10px 14px;font-size:12px;font-weight:500;text-align:right;border-radius:0 4px 0 0">Amount</th>
+      </tr>
+    </thead>
+    <tbody>${itemRows}</tbody>
+  </table>
+
+  <!-- TOTALS -->
+  <table width="100%" style="margin-bottom:28px"><tr><td></td>
+    <td width="300" style="text-align:right">
+      <table width="100%">
+        <tr><td style="padding:4px 0;font-size:13px;color:#888">Subtotal:</td><td style="padding:4px 0;font-size:13px;text-align:right">${currency}${fmt(sub)}</td></tr>
+        ${!noTax ? `<tr><td style="padding:4px 0;font-size:13px;color:#888">${esc(taxType)} (${taxRate}%):</td><td style="padding:4px 0;font-size:13px;text-align:right">${currency}${fmt(taxAmt)}</td></tr>` : ''}
+        ${disc > 0 ? `<tr><td style="padding:4px 0;font-size:13px;color:#888">Discount:</td><td style="padding:4px 0;font-size:13px;text-align:right">-${currency}${fmt(disc)}</td></tr>` : ''}
+        ${ship > 0 ? `<tr><td style="padding:4px 0;font-size:13px;color:#888">Shipping:</td><td style="padding:4px 0;font-size:13px;text-align:right">${currency}${fmt(ship)}</td></tr>` : ''}
+        ${paid > 0 ? `<tr><td style="padding:4px 0;font-size:13px;color:#888">Amount Paid:</td><td style="padding:4px 0;font-size:13px;text-align:right">-${currency}${fmt(paid)}</td></tr>` : ''}
+        <tr><td colspan="2"><hr style="border:none;border-top:1.5px solid #ccc;margin:6px 0"></td></tr>
+        <tr><td style="padding:4px 0;font-size:14px;font-weight:700;color:#888">Total:</td><td style="padding:4px 0;font-size:14px;font-weight:700;text-align:right">${currency}${fmt(total)}</td></tr>
+      </table>
+    </td>
+  </tr></table>
+
+  <!-- NOTES / TERMS -->
+  ${notes || terms ? `<div style="border-top:1px solid #e8e8e8;padding-top:14px;font-size:13px;line-height:1.75">
+    ${notes ? `<div style="color:#888;font-size:12px;margin-bottom:3px">Notes:</div><div style="margin-bottom:12px">${notes.replace(/\n/g,'<br>')}</div>` : ''}
+    ${terms ? `<div style="color:#888;font-size:12px;margin-bottom:3px">Terms &amp; Conditions:</div><div>${terms.replace(/\n/g,'<br>')}</div>` : ''}
+  </div>` : ''}
+  </div>`;
+
+  document.getElementById('printContainer').innerHTML = html;
+  window.print();
 }
 
 function escHtml(s) {

@@ -1267,8 +1267,32 @@ function downloadPDF() {
   const worker = html2pdf().from(html).set(opt);
   const fileName = `Invoice_${invNum || 'Draft'}.pdf`;
 
-  // Check if Web Share API is supported for sending files (standard on mobile browsers / WebViews)
-  if (navigator.share && navigator.canShare) {
+  const isWebView = /wv|Android.*Version\/[0-9.]+/i.test(navigator.userAgent);
+
+  function savePDF() {
+    if (isWebView) {
+      worker.outputPdf('datauristring').then(pdfDataUri => {
+        const link = document.createElement('a');
+        link.href = pdfDataUri;
+        link.download = fileName;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        
+        // Secondary fallback for aggressive WebView engines
+        setTimeout(() => {
+          window.location.href = pdfDataUri;
+        }, 150);
+      }).catch(() => {
+        worker.save();
+      });
+    } else {
+      worker.save();
+    }
+  }
+
+  // Check if Web Share API is supported for sending files (standard on mobile browsers)
+  if (!isWebView && navigator.share && navigator.canShare) {
     worker.outputPdf('blob').then(pdfBlob => {
       const file = new File([pdfBlob], fileName, { type: 'application/pdf' });
       if (navigator.canShare({ files: [file] })) {
@@ -1276,19 +1300,17 @@ function downloadPDF() {
           files: [file],
           title: `Invoice #${invNum || 'Draft'}`,
           text: `Tax Invoice #${invNum || 'Draft'}`
-        }).catch(err => {
-          // Fallback if sharing sheet is closed or cancelled
-          worker.save();
+        }).catch(() => {
+          savePDF();
         });
       } else {
-        worker.save();
+        savePDF();
       }
-    }).catch(err => {
-      worker.save();
+    }).catch(() => {
+      savePDF();
     });
   } else {
-    // Fallback for laptop/desktop browsers
-    worker.save();
+    savePDF();
   }
 }
 
